@@ -301,6 +301,9 @@ function editVersion({ collection, item, primaryKeyField, versionKey }: { collec
 .tree-label, .tree-additional {
 	display: flex;
 	align-items: center;
+	flex-grow: 1;
+	flex-shrink: 1;
+	min-width: 0;
 	height: 48px;
 	line-height: 1;
 	padding-left: 6px;
@@ -309,7 +312,8 @@ function editVersion({ collection, item, primaryKeyField, versionKey }: { collec
 }
 
 .tree-additional {
-	flex-grow: 1;
+	flex-grow: 0;
+	flex-shrink: 0;
 	justify-content: end;
 }
 
@@ -321,6 +325,7 @@ function editVersion({ collection, item, primaryKeyField, versionKey }: { collec
 	flex-grow: 1;
 	border: 2px solid transparent;
 	margin-top: -2px;
+	min-width: 0;
 }
 
 .sorting .tree-label, .selected .tree-label {
@@ -345,6 +350,7 @@ function editVersion({ collection, item, primaryKeyField, versionKey }: { collec
 	align-items: center;
 	flex-grow: 1;
 	margin-left: 4px;
+	min-width: 0;
 }
 
 .tree-item .tree-item-name {
