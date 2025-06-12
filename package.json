@@ -3,7 +3,7 @@
 	"description": "Visulaizes a hierarchical table of webpages based on parent-child relationships, allowing users to intuitively explore and manage a site strcuture in Directus.",
 	"icon": "extension",
 	"author": "Tim Butterfield",
-	"version": "0.1.1",
+	"version": "0.1.2",
 	"license": "MIT",
 	"keywords": [
 		"directus",
