@@ -258,7 +258,7 @@ export default defineLayout({
 		
 			const fieldsDefaultValue = computed(() => {
 				return fieldsInCollection.value
-					.filter((field) => !field.meta?.hidden)
+					.filter((field) => !field.meta?.hidden && field.type != 'alias')
 					.slice(0, 4)
 					.map(({ field }) => field)
 					.sort();
