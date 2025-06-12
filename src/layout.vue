@@ -191,10 +191,6 @@ watch(innerWidth, (value) => {
   margin-bottom: 24px;
 }
 
-.site-structure {
-
-}
-
 .fuelux {
   background: repeating-linear-gradient(to bottom, var(--border-subdued) 0px, var(--border-subdued) 1px, transparent 1px, transparent 49px, var(--border-subdued) 49px, var(--border-subdued) 50px);
   padding: 0 2em 4px;

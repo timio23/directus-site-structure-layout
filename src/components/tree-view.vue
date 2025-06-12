@@ -2,7 +2,7 @@
 import type { ShowSelect } from '@directus/extensions';
 import type { Branches, Depths, Item, ItemSelectEvent, LayoutOptions } from '../types';
 import type { PrimaryKey, ContentVersion } from '@directus/types';
-import type { ComputedRef, Ref } from 'vue';
+import type { Ref } from 'vue';
 import { useSessionStorage } from '@vueuse/core';
 import { clone, cloneDeep } from 'lodash';
 import { computed, ref, toRef, watch, nextTick, } from 'vue';
@@ -191,12 +191,6 @@ watch(
 	(newItems) => (internalItems.value = newItems),
 );
 
-const sortIsManual = computed(
-	// () => internalSort.value.by === props.manualSortKey,
-	() => true,
-);
-// console.log(`sortIsManual: ${internalSort.value.by === props.manualSortKey}`)
-
 const {
 	// gridTemplateTreeColumnWidth,
 	depthChangeMax,
@@ -213,8 +207,7 @@ const {
 	itemKey: toRef(props, 'itemKey'),
 	sortKey: toRef(props, 'manualSortKey'),
 	showManualSort: toRef(props, 'showManualSort'),
-	collection: toRef(props, 'collection'),
-	sortIsManual,
+	collection: toRef(props, 'collection')
 });
 
 function useTreeView({
@@ -223,8 +216,7 @@ function useTreeView({
 	itemKey,
 	sortKey,
 	showManualSort,
-	collection,
-	sortIsManual,
+	collection
 }: {
 	internalItems: Ref<Item[]>;
 	parentField: Ref<string | null>;
@@ -232,7 +224,6 @@ function useTreeView({
 	sortKey: Ref<string | undefined>;
 	showManualSort: Ref<boolean>;
 	collection: Ref<string>;
-	sortIsManual: ComputedRef<boolean>;
 }) {
 	const itemDepth = '--depth';
 	const itemParent = '--parentId';
@@ -306,7 +297,6 @@ function useTreeView({
 			&& !!parentField.value
 			&& showManualSort.value
 			&& !!sortKey.value
-			&& sortIsManual.value
 		);
 	}
 
@@ -725,7 +715,7 @@ async function deleteAndQuit() {
               :item-depth
               :item-parent="!!parentField ? itemParent : null"
               :snap-step="controlIconWidth"
-              :disabled="disabled || !sortIsManual || selectMode"
+              :disabled="disabled || selectMode"
               @manual-sort="onSortUpdate"
             >
               <TreeItem
@@ -748,7 +738,6 @@ async function deleteAndQuit() {
 								:select-mode="selectMode"
                 :is-selected="getSelectedState(item)"
                 :subdued="loading || reordering"
-                :sorted-manually="sortIsManual"
                 :has-click-listener="!disabled && clickable"
                 :height="rowHeight"
 								:layout-options="layoutOptions"

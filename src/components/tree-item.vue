@@ -33,7 +33,6 @@ const props = withDefaults(
 		showManualSort?: boolean;
 		isSelected?: boolean;
 		subdued?: boolean;
-		sortedManually?: boolean;
 		hasClickListener?: boolean;
 		height?: number;
 		layoutOptions: LayoutOptions | null;
@@ -47,7 +46,6 @@ const props = withDefaults(
 		showManualSort: false,
 		isSelected: false,
 		subdued: false,
-		sortedManually: false,
 		hasClickListener: false,
 		height: 48,
 	},
@@ -189,7 +187,7 @@ function editVersion({ collection, item, primaryKeyField, versionKey }: { collec
 				v-if="toggleSort && showManualSort && !selectMode"
 				name="drag_handle"
 				class="drag-handle manual"
-				:class="{ 'sorted-manually': sortedManually, nestable }"
+				:class="{ 'sorted-manually': nestable }"
 				@click.stop
 				@mousedown.prevent="onMouseDown(item, $event)"
 			/>
