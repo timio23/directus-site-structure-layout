@@ -24,6 +24,7 @@ const props = withDefaults(
 		toggleSort?: boolean;
 		indent?: number;
 		indentWidth?: number;
+		isFiltered: boolean;
 		sorting?: boolean;
 		childrenCollapsed?: boolean;
 		collapsed?: boolean;
@@ -160,15 +161,15 @@ function editVersion({ collection, item, primaryKeyField, versionKey }: { collec
 		<div
 			class="pull-left"
 			:class="{
-				inBranch: !selectMode
+				inBranch: !selectMode && !isFiltered
 			}"
 			:style="{
-				marginLeft: `${indent}px`,
+				marginLeft: !isFiltered ? `${indent}px` : '0px',
 				marginRight: selectMode ? '30px' : '10px',
 			}"
 		>
 			<BranchLine
-				v-if="!selectMode && item[parentKey]"
+				v-if="item[parentKey] && !selectMode && !isFiltered"
 				v-model:branches="branches"
 				:key="`${item[itemKey]}_${item[parentKey]}`"
 				:branch-id="item[itemKey]"
@@ -176,13 +177,13 @@ function editVersion({ collection, item, primaryKeyField, versionKey }: { collec
 				updateChildren
 			/>
 			<v-icon
-				v-if="hasChildren"
+				v-if="hasChildren && !isFiltered"
 				:name="childrenCollapsed ? 'add_circle_outline' : 'remove_circle_outline'"
 				class="collapse-btn"
 				:class="{ 'children-collapsed': childrenCollapsed }"
 				@click.stop="$emit('toggle-children')"
 			/>
-			<span v-else class="icon-placeholder"></span>
+			<span v-else-if="!isFiltered" class="icon-placeholder"></span>
 			<v-icon
 				v-if="toggleSort && showManualSort && !selectMode"
 				name="drag_handle"
@@ -274,11 +275,13 @@ function editVersion({ collection, item, primaryKeyField, versionKey }: { collec
 <style scoped>
 .icon-placeholder {
 	display: block;
+	min-width: 25px;
 	width: 25px;
 }
 
 .v-icon.collapse-btn {
 	position: relative;
+	min-width: 25px;
 	width: 25px;
 	padding: 0 0.5px;
 	z-index: 2;

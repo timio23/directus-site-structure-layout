@@ -15,6 +15,7 @@ const props = withDefaults(
 		items: Item[];
 		versions: ContentVersion[],
 		sort: string[],
+		isFiltered: boolean;
 		itemKey?: string;
 		mustSort?: boolean;
 		showSelect?: ShowSelect;
@@ -732,6 +733,7 @@ async function deleteAndQuit() {
 								:branch-lines-key="itemBranchLines"
                 :indent="currentDepth * controlIconWidth"
 								:indent-width="controlIconWidth"
+								:is-filtered="isFiltered"
                 :sorting="isSorting || parentSorting"
                 :has-children="item[childrenKey]?.length"
                 :children-collapsed="item[collapsedKey]"
@@ -785,7 +787,7 @@ async function deleteAndQuit() {
 	.widget-toolbar {
 		display: flex;
 		justify-content: space-between;
-		padding-left: 32px;
+		padding-left: 35px;
 		padding-bottom: 10px;
 		border-bottom: 2px solid var(--theme--border-color-subdued);
 	}

@@ -135,6 +135,7 @@ watch(innerWidth, (value) => {
 			:versions
 			:sort="sort"
 			:loading="loading"
+			:is-filtered="isFiltered"
 			:item-key="primaryKeyField?.field"
 			:show-manual-sort="!isFiltered"
 			:toggle-sort="sortAllowed"
