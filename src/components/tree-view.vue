@@ -248,6 +248,9 @@ function useTreeView({
 	watch(() => parentField.value, initTreeView);
 	watch(() => parentField.value, resetIfNoParentSelected);
 
+	initTreeView;
+	treeLoading.value = false;
+
 	return {
 		// gridTemplateTreeColumnWidth,
 		depthChangeMax,
