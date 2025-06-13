@@ -4,12 +4,14 @@ defineOptions({ inheritAttrs: false });
 // const router = useRouter();
 defineProps<{
 	showingCount?: string;
+    limit: number;
+    itemCount: number;
 }>();
 </script>
 <template>
     <transition name="fade">
 		<span
-			v-if="showingCount"
+			v-if="showingCount && itemCount <= limit"
 			class="item-count"
 		>
 			{{ showingCount }}

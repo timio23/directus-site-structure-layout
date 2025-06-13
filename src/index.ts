@@ -108,8 +108,8 @@ export default defineLayout({
 			getTotalCount
 		} = useItems(collection, {
 			sort: ref([primaryKeyField.value?.field ?? 'id']),
-			limit: selectMode ? limit : ref(-1),
-			page: selectMode ? page : ref(1),
+			limit: selectMode.value || isFiltered.value ? limit : ref(-1),
+			page: selectMode.value || isFiltered.value ? page : ref(1),
 			fields: ref<string[]>(combinedFieldsQuery.filter((value, index) => combinedFieldsQuery.indexOf(value) === index)),
 			alias: aliasQuery,
 			filter,

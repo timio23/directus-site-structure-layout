@@ -158,7 +158,7 @@ watch(innerWidth, (value) => {
 			@delete:item="deletePage"
 		/>
 		<div class="footer">
-			<div class="pagination">
+			<div v-if="selectMode || isFiltered" class="pagination">
 				<v-pagination
 					v-if="totalPages > 1"
 					:length="totalPages"
@@ -169,7 +169,7 @@ watch(innerWidth, (value) => {
 				/>
 			</div>
 
-			<div v-if="loading === false && items.length >= 25" class="per-page">
+			<div v-if="loading === false && items.length >= 25 && itemCount && itemCount <= limit" class="per-page">
 				<span>{{ t('per_page') }}</span>
 				<v-select :model-value="`${limit}`" :items="pageSizes" inline @update:model-value="limitWritable = +$event" />
 			</div>
@@ -315,6 +315,17 @@ watch(innerWidth, (value) => {
 }
 
 .footer {
-	padding: 0 30px;
+	padding: 20px 30px;
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+}
+
+.footer .per-page {
+	display: flex;
+}
+
+.footer .per-page > span {
+	margin-right: 10px;
 }
 </style>
