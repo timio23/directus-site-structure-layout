@@ -400,8 +400,8 @@ function editVersion({ collection, item, primaryKeyField, versionKey }: { collec
   left: -15px;
   width: 30px;
   height: 0;
-  border-top: 1px dotted var(--theme--foreground);
-  border-top-color: var(--theme--foreground);
+  border-top: 1px dotted var(--theme--foreground-subdued);
+  border-top-color: var(--theme--foreground-subdued);
   z-index: 1;
 }
 

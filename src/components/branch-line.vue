@@ -24,7 +24,7 @@
   }
 </script>
 <template>
-  <div v-if="branch && depth > 0" :style="{ borderColor: children > 0 ? 'var(--theme--foreground)' : 'transparent' }" class="line" :data-parent="parent_id" :data-id="branch.id" :data-depth="branch['--depth']" :data-parents="branch.parents" :data-children="branch.children">
+  <div v-if="branch && depth > 0" :style="{ borderColor: children > 0 ? 'var(--theme--foreground-subdued)' : 'transparent' }" class="line" :data-parent="parent_id" :data-id="branch.id" :data-depth="branch['--depth']" :data-parents="branch.parents" :data-children="branch.children">
     <branch-line
       v-if="branches[parent_id]"
       v-model:branches="branches"
@@ -43,5 +43,10 @@
     width: 0;
     border-left: 1px dotted var(--theme--foreground);
     border-left-color: var(--theme--foreground);
+  }
+
+  .dark .line {
+    border-left: 1px dotted var(--theme--foreground-subdued);
+    border-left-color: var(--theme--foreground-subdued);
   }
 </style>
