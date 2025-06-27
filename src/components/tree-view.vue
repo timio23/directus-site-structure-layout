@@ -9,6 +9,7 @@ import { computed, ref, toRef, watch, nextTick, } from 'vue';
 import { useI18n } from 'vue-i18n';
 import Sortable from './sortable.vue';
 import TreeItem from './tree-item.vue';
+import Loading from './loading.vue';
 
 const props = withDefaults(
 	defineProps<{
@@ -23,9 +24,9 @@ const props = withDefaults(
 		manualSortKey?: string;
 		toggleSort?: boolean;
 		allowHeaderReorder?: boolean;
-		modelValue?: any[];
 		fixedHeader?: boolean;
 		loading?: boolean;
+		loadingAll?: boolean;
 		loadingText?: string;
 		noItemsText?: string;
 		selectionUseKeys?: boolean;
@@ -33,10 +34,14 @@ const props = withDefaults(
 		disabled?: boolean;
 		clickable?: boolean;
 		parentField: string | null;
+		parents: PrimaryKey[] | never[];
+		childrenField: string | null;
 		collection: string;
 		selectMode: boolean;
 		canDeletePages: boolean;
 		layoutOptions: LayoutOptions | null,
+		fetchAllRecords: (currentItems: PrimaryKey[]) => Promise<Item[]>;
+		fetchChildren: (parentID: string) => Promise<Item[]>;
 	}>(),
 	{
 		itemKey: 'id',
@@ -45,7 +50,7 @@ const props = withDefaults(
 		showManualSort: false,
 		manualSortKey: undefined,
 		allowHeaderReorder: false,
-		modelValue: () => [],
+		// modelValue: () => [],
 		fixedHeader: false,
 		loading: false,
 		// CORE CHANGE
@@ -57,6 +62,9 @@ const props = withDefaults(
 		clickable: true,
 	},
 );
+
+const selectedItems = defineModel<any[]>('selection', { default: [] });
+const expandedState = defineModel<PrimaryKey[]>('expanded', { default: [] });
 
 const { t } = useI18n();
 const rowHeight = ref<number>(48);
@@ -73,7 +81,7 @@ const emit = defineEmits([
 	'click:row',
 	'update:sort',
 	'item-selected',
-	'update:modelValue',
+	// 'update:modelValue',
   'update:items',
 	'delete:item',
 ]);
@@ -91,18 +99,26 @@ const emit = defineEmits([
 // });
 
 const reordering = ref<boolean>(false);
+const newChildren = ref<Item[]>([]);
 
 // const allItemsSelected = computed<boolean>(() => {
 // 	return (
 // 		props.loading === false
 // 		&& props.items.length > 0
-// 		&& props.modelValue.length === props.items.length
+// 		&& selectedItems.value.length === props.items.length
 // 	);
 // });
 
 // const someItemsSelected = computed<boolean>(() => {
-// 	return props.modelValue.length > 0 && allItemsSelected.value === false;
+// 	return selectedItems.value.length > 0 && allItemsSelected.value === false;
 // });
+
+watch(() => manualSort.value, (newVal) => {
+	console.log("Sort Triggered", newVal);
+	if(newVal){
+		props.fetchAllRecords(internalItems.value.map((item) => item[props.itemKey]));
+	}
+});
 
 function itemHasNoKeyYet(item: Item) {
 	return !item[props.itemKey] && item.$index !== undefined;
@@ -111,7 +127,7 @@ function itemHasNoKeyYet(item: Item) {
 function onItemSelected(event: ItemSelectEvent) {
 	if (props.disabled) return;
 	emit('item-selected', event);
-	let selection = clone(props.modelValue) as any[];
+	let selection = clone(selectedItems.value) as any[];
 	if (event.value === true) {
 		if (props.selectionUseKeys) {
 			selection.push(event.item[props.itemKey]);
@@ -135,16 +151,17 @@ function onItemSelected(event: ItemSelectEvent) {
 		selection = selection.slice(-1);
 	}
 
-	emit('update:modelValue', selection);
+	// emit('update:modelValue', selection);
+	selectedItems.value = selection;
 }
 
 function getSelectedState(item: Item) {
 	if (!props.selectionUseKeys && itemHasNoKeyYet(item)) {
-		const selectedKeys = props.modelValue.map((item) => item.$index);
+		const selectedKeys = selectedItems.value?.map((item) => item.$index) ?? [];
 		return selectedKeys.includes(item.$index);
 	}
 
-	const selectedKeys = props.selectionUseKeys ? props.modelValue : props.modelValue.map((item) => item[props.itemKey]);
+	const selectedKeys = props.selectionUseKeys ? selectedItems.value ?? [] : selectedItems.value?.map((item) => item[props.itemKey]) ?? [];
 
 	return selectedKeys.includes(item[props.itemKey]);
 }
@@ -154,15 +171,18 @@ function onToggleSelectAll() {
 
 	if (selectAll.value === true) {
 		if (props.selectionUseKeys) {
-			emit(
-				'update:modelValue',
-				clone(props.items).map((item) => item[props.itemKey]),
-			);
+			// emit(
+			// 	'update:modelValue',
+			// 	clone(props.items).map((item) => item[props.itemKey]),
+			// );
+			selectedItems.value = clone(internalItems.value).map((item) => item[props.itemKey]);
 		} else {
-			emit('update:modelValue', clone(props.items));
+			// emit('update:modelValue', clone(props.items));
+			selectedItems.value = clone(internalItems.value);
 		}
 	} else {
-		emit('update:modelValue', []);
+		// emit('update:modelValue', []);
+		selectedItems.value = [];
 	}
 }
 
@@ -189,8 +209,21 @@ const internalItems = ref(props.items);
 
 watch(
 	() => props.items,
-	(newItems) => (internalItems.value = newItems),
+	(newItems) => {
+		if(!props.loadingAll){
+			internalItems.value = newItems;
+			console.log("props.items Changes");
+		}
+	}
 );
+
+// watch(
+// 	() => newChildren.value,
+// 	() => {
+// 		internalItems.value = [...props.items, ...newChildren.value];
+// 		console.log(internalItems.value);
+// 	}
+// );
 
 const {
 	// gridTemplateTreeColumnWidth,
@@ -205,6 +238,7 @@ const {
 } = useTreeView({
 	internalItems,
 	parentField: toRef(props, 'parentField'),
+	childrenField: toRef(props, 'childrenField'),
 	itemKey: toRef(props, 'itemKey'),
 	sortKey: toRef(props, 'manualSortKey'),
 	showManualSort: toRef(props, 'showManualSort'),
@@ -214,6 +248,7 @@ const {
 function useTreeView({
 	internalItems,
 	parentField,
+	childrenField,
 	itemKey,
 	sortKey,
 	showManualSort,
@@ -221,6 +256,7 @@ function useTreeView({
 }: {
 	internalItems: Ref<Item[]>;
 	parentField: Ref<string | null>;
+	childrenField: Ref<string | null>;
 	itemKey: Ref<string>;
 	sortKey: Ref<string | undefined>;
 	showManualSort: Ref<boolean>;
@@ -229,22 +265,20 @@ function useTreeView({
 	const itemDepth = '--depth';
 	const itemParent = '--parentId';
 	const treeViewAble = computed(isTreeViewAble);
-	// console.log(`treeViewAble: ${treeViewAble.value}`);
 	const depthChangeMax = ref(0);
 	const sortChange = ref<{ id: PrimaryKey; parent: PrimaryKey | null } | null>(null);
-	// const maxDepths = computed(getMaxDepths);
-	// const gridTemplateTreeColumnWidth = computed(calculateColumnWidth);
 
 	const {
 		childrenKey,
 		collapsedKey,
 		collapsedParentsKey,
 		onToggleChildren,
-		isCollapsed,
+		isExpanded,
 		initCollapsedChildren,
 	} = useCollapsible();
 
 	watch(() => props.items, initTreeView);
+	watch(() => newChildren.value, initTreeView);
 	watch(() => treeViewAble.value, initTreeView);
 	watch(() => parentField.value, initTreeView);
 	watch(() => parentField.value, resetIfNoParentSelected);
@@ -253,7 +287,6 @@ function useTreeView({
 	treeLoading.value = false;
 
 	return {
-		// gridTemplateTreeColumnWidth,
 		depthChangeMax,
 		itemDepth,
 		itemParent,
@@ -274,8 +307,9 @@ function useTreeView({
 
 	function initTreeView() {
 		treeLoading.value = true;
+
 		if (treeViewAble.value) {
-			internalItems.value = internalItems.value.map((item) => {
+			internalItems.value = [...internalItems.value, ...newChildren.value].map((item) => {
 				if(item[itemKey.value] === sortChange.value?.id){
 					item[props.parentField!] = sortChange.value?.parent;
 					item[itemParent] = sortChange.value?.parent;
@@ -287,9 +321,9 @@ function useTreeView({
 			);
 
 			internalItems.value = sortedResult;
-			initCollapsedChildren();
+			// initCollapsedChildren(); <-- not needed
 
-			if (orderChanged)
+			if (orderChanged && manualSort.value)
 				onSortUpdate({ sort: true, parent: null });
 		}
 		treeLoading.value = false;
@@ -304,28 +338,20 @@ function useTreeView({
 		);
 	}
 
-	// function calculateColumnWidth() {
-	// 	return maxDepths.value * controlIconWidth;
-	// }
-
-	// function getMaxDepths() {
-	// 	return Math.max(
-	// 		...internalItems.value.map((item) => item[itemDepth] ?? 0),
-	// 		depthChangeMax.value,
-	// 	);
-	// }
-
 	/** Calculates `[itemDepth]`, `[itemParent]` (id) and `[childrenKey]` */
 	function calculateTreeProps(data: Item[]) {
 		const map: any = {};
 
 		for (const item of data) {
 			item[itemParent] = getParentId(item);
-			item[childrenKey] = data.filter(
-				(child) => child[itemParent] === item[itemKey.value],
-			).map((child) => child[itemKey.value]);
-			item[collapsedKey] = isCollapsed(item[itemKey.value]);
-			item[collapsedParentsKey] = [];
+			//if(!childrenField.value){
+				item[childrenKey] = data.filter(
+					(child) => child[itemParent] === item[itemKey.value],
+				).map((child) => child[itemKey.value]);
+			//}
+			
+			item[collapsedKey] = !isExpanded(item[itemKey.value]);
+			item[collapsedParentsKey] = !item[itemParent] || expandedState.value.includes(item[itemParent])? false : true;
 
 			map[item[itemKey.value]] = item;
 		}
@@ -349,71 +375,13 @@ function useTreeView({
 			};
 		});
 
-		// Object.keys(map).sort(function(a, b) {
-		// 	const sortkey = props.manualSortKey ?? 'sort';
-		// 	return map[a][sortkey] - map[b][sortkey];
-		// }).forEach(doStuff);
-
-		// function doStuff(key: number | string){
-		// 	const item = map[key];
-			
-		// 	if (!(itemBranchLines in item))
-		// 		calculateBranchLines(item);
-		// 	let depthsCount = itemDepths.value ? itemDepths.value[item[itemDepth]] ?? [] : [];
-		// 	if(depthsCount){
-		// 		const depth_index = depthsCount.indexOf(item[props.itemKey]);
-		// 		if (depth_index > -1) {
-		// 			itemDepths.value?.[item[itemDepth]]?.splice(depth_index, 1);
-		// 		}
-		// 	}
-		// }
-
-		// function buildNestedTree(pages: Item[]) {
-		// 		const map: any = {};
-		// 		const result: Nest[] = [];
-
-		// 		pages.forEach(item => {
-		// 				map[item[itemKey.value]] = {
-		// 					[itemKey.value]: item[itemKey.value],
-		// 					[itemParent]: item[itemParent],
-		// 					children: [],
-		// 				};
-		// 		});
-
-		// 		pages.forEach(item => {
-		// 				const node = map[item[itemKey.value]];
-		// 				if (!(itemDepth in node))
-		// 					setDepth(node);
-		// 				if (item[itemParent] !== null) {
-		// 						map[item[itemParent]].children.push(node);
-		// 				} else {
-		// 						result.push(node);
-		// 				}
-		// 		});
-
-		// 		return result;
-		// }
-
-		// const buildNestedTree = (parentId?: number | string): Item => (item: Item) => {
-		// 	const children = data.filter((child) => child.parentId === item.id);
-		// 	return {
-		// 		...item,
-		// 		...(children.length > 0 && { children: children.map(buildNestedTree(item.id)) }),
-		// 	};
-		// };
-
-		// nestedData.value = buildNestedTree(data);
-
 		return Object.values(map) as Item[];
 
 		function getParentId(item: Item) {
 			if (!parentField.value)
 				return null;
 
-			return (
-				item[parentField.value]?.[itemKey.value]
-				?? item[parentField.value]
-			);
+			return item[parentField.value];
 		}
 
 		function setDepth(item: Item) {
@@ -431,7 +399,6 @@ function useTreeView({
 					if(itemDepths.value[item[itemDepth]] === undefined){
 						itemDepths.value[item[itemDepth]] = [];
 					}
-					// console.log(`item: ${item[itemKey.value]}, depth: ${item[itemDepth]}`);
 					itemDepths.value[item[itemDepth]]?.push(item[itemKey.value]);
 				}
 			}
@@ -440,7 +407,6 @@ function useTreeView({
 				if(itemDepths.value[0] === undefined){
 					itemDepths.value[0] = [];
 				}
-				// console.log(`item: ${item[itemKey.value]}, depth: ${item[itemDepth]}`);
 				itemDepths.value[0].push(item[itemKey.value]);
 			}
 		}
@@ -458,10 +424,12 @@ function useTreeView({
 	}
 
 	function reorder(items: Item[]) {
+
+		console.log("reorder", items);
 		let sortedResult: Item[] = [];
 		let orderChanged = false;
 
-		const rootItems = items.filter((item) => item[itemDepth] === 0);
+		const rootItems = items.filter((item) => item[props.parentField!] === null);
 		rootItems.sort(sortBySortKey);
 		rootItems.forEach(addItem);
 		applySortValues();
@@ -499,13 +467,6 @@ function useTreeView({
 				item[childrenKey].push(child[itemKey.value]);
 				const childrenIds = addItem(child);
 				item[childrenKey].push(...childrenIds);
-
-				// branches.value[child[itemKey.value]] = {
-				// 	parents: item[childrenKey].length ?? 0,
-				// 	// children: item[childrenKey].length ?? 0,
-				// 	[itemDepth]: child[itemDepth],
-				// 	[itemParent]: child[itemParent],
-				// };
 			}
 
 			return item[childrenKey];
@@ -523,39 +484,16 @@ function useTreeView({
 
 	async function onSortUpdate({ sort, parent }: SortUpdateParams) {
 		treeLoading.value = true;
-		let edits: any = {};
-
-		// console.log('parent', parent);
 		sortChange.value = parent;
 
+		let edits: any = {};
+
 		if (sort) {
-			// const map: any = {};
 			for (const item of internalItems.value) {
 				edits[item[props.itemKey]] = {
 					[props.manualSortKey!]: item[props.manualSortKey!],
 				};
 			}
-
-			// for (const key in map) {
-			// 	const item = map[key];
-			// 	branches.value[item[itemKey.value]] = {
-			// 		parents: item[itemKey.value] === parent?.id && parent?.parent ? 1 + map[parent.parent]?.[childrenKey].length : map[item[itemParent]]?.[childrenKey].length ?? 0,
-			// 		children: item[childrenKey].length ?? 0,
-			// 		[itemDepth]: item[itemDepth],
-			// 		[itemParent]: item[itemParent],
-			// 	};
-			// };
-
-			// for (const item of internalItems.value) {
-			// 	calculateBranchLines(item);
-			// 	let depthsCount = itemDepths.value ? itemDepths.value[item[itemDepth]] ?? [] : [];
-			// 	if(depthsCount){
-			// 		const depth_index = depthsCount.indexOf(item[props.itemKey]);
-			// 		if (depth_index > -1) {
-			// 			itemDepths.value?.[item[itemDepth]]?.splice(depth_index, 1);
-			// 		}
-			// 	}
-			// }
 		}
 
 		if (parent && parentField.value) {
@@ -596,46 +534,60 @@ function useTreeView({
 		const collapsedKey = '--collapsed';
 		const collapsedParentsKey = '--collapsed-parents';
 
-		const collapsedState = useSessionStorage<PrimaryKey[]>(
-			`${collection.value}--tree-view-collapsed-items`,
-			[],
-		);
-
 		return {
 			childrenKey,
 			collapsedKey,
 			collapsedParentsKey,
 			onToggleChildren,
-			isCollapsed,
+			isExpanded,
 			initCollapsedChildren,
 		};
 
-		function isCollapsed(id: PrimaryKey) {
-			return collapsedState.value.includes(id);
+		function isExpanded(id: PrimaryKey) {
+			return expandedState.value?.includes(id);
 		}
 
-		function onToggleChildren(item: Item) {
-			if (!item[childrenKey]?.length)
+		async function onToggleChildren(item: Item) {
+			if (!childrenField.value || !item[childrenField.value]?.length){
 				return;
+			}
+
+			if(!item[childrenKey]?.length){ // Prevent fetching more than once
+				const children = await props.fetchChildren(item[itemKey.value]);
+				newChildren.value = [...newChildren.value, ...children];
+				// console.log(newChildren.value);
+			}
 
 			item[collapsedKey] = toggleItem(item[props.itemKey]);
-			collapseChildren(item[itemKey.value], item[childrenKey]);
+			// console.log('collapsed', item[collapsedKey]);
+			await collapseChildren(item[itemKey.value], item[childrenField.value!]);
 		}
 
 		function toggleItem(id: PrimaryKey): boolean {
-			const index = collapsedState.value.indexOf(id);
-
-			if (index !== -1) {
-				collapsedState.value.splice(index, 1);
+			if(!expandedState.value){
+				expandedState.value = [id];
 				return false;
 			}
 
-			collapsedState.value.push(id);
-			return true;
+			let newExpandedState = clone(expandedState.value);
+
+			const index = expandedState.value.indexOf(id);
+
+			if (index !== -1) {
+				newExpandedState.splice(index, 1);
+				expandedState.value = newExpandedState;
+				console.log("Removed id from expanded list");
+				return true;
+			}
+
+			newExpandedState.push(id);
+			expandedState.value = newExpandedState;
+			console.log("Added id to expanded list");
+			return false;
 		}
 
-		function initCollapsedChildren() {
-			collapsedState.value.forEach((collapsedId: PrimaryKey) => {
+		function initCollapsedChildren() { // Not needed
+			expandedState.value?.forEach((collapsedId: PrimaryKey) => {
 				const childrenIds = internalItems.value?.find(
 					(item) => item[itemKey.value] === collapsedId,
 				)?.[childrenKey];
@@ -644,24 +596,12 @@ function useTreeView({
 			});
 		}
 
-		function collapseChildren(
-			id: PrimaryKey,
-			childrenIds: PrimaryKey[],
-		) {
-			for (const childItem of internalItems.value
-				.filter((internalItem) =>
-					childrenIds.includes(internalItem[itemKey.value]),
-				)) {
-				const parentIndex = childItem[collapsedParentsKey]?.indexOf(id);
+		async function collapseChildren( id: PrimaryKey, childrenIds: PrimaryKey[] ) {
+			for (const childItem of internalItems.value.filter((internalItem) => childrenIds.includes(internalItem[itemKey.value]))) {
+				childItem[collapsedParentsKey] = !childItem[collapsedParentsKey];
 
-				if (parentIndex > -1) {
-					childItem[collapsedParentsKey].splice(
-						parentIndex,
-						1,
-					);
-				}
-				else {
-					childItem[collapsedParentsKey].push(id);
+				if(childItem[childrenField.value!]?.length && !childItem[collapsedKey]){
+					await collapseChildren(childItem[itemKey.value], childItem[childrenField.value!]);
 				}
 			}
 		}
@@ -699,7 +639,7 @@ async function deleteAndQuit() {
     <div class="widget-main">
       <div class="fuelux">
         <div class="tree tree-folder-select" role="tree">
-					<VSkeletonLoader style="margin: " v-if="loading || treeLoading" />
+					<Loading v-if="loading || treeLoading || loadingAll" />
           <template v-else-if="items.length === 0">
             {{ noItemsText || $t("no_items") }}
           </template>
@@ -735,9 +675,9 @@ async function deleteAndQuit() {
 								:indent-width="controlIconWidth"
 								:is-filtered="isFiltered"
                 :sorting="isSorting || parentSorting"
-                :has-children="item[childrenKey]?.length"
+                :has-children="(childrenField && item[childrenField]?.length) || item[childrenKey]?.length"
                 :children-collapsed="item[collapsedKey]"
-                :collapsed="!!item[collapsedParentsKey]?.length"
+                :collapsed="!!item[collapsedParentsKey]"
                 :show-select="disabled ? 'none' : showSelect"
                 :show-manual-sort="!disabled && showManualSort"
 								:select-mode="selectMode"

@@ -16,6 +16,7 @@ export interface Nest {
 }
 
 export type LayoutOptions = {
+	childrenField?: string;
 	pageTitle?: string;
   pageType?: string;
 	pageSlug?: string;

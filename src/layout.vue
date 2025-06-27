@@ -8,6 +8,7 @@ import { Ref, computed, inject, ref, watch, toRefs } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { useStores } from '@directus/extensions-sdk';
 import TreeView from './components/tree-view.vue';
+import Loading from './components/loading.vue';
 
 defineOptions({ inheritAttrs: false });
 
@@ -15,6 +16,7 @@ const props = withDefaults(
 	defineProps<{
 		collection: string;
 		items: Item[];
+		allItems: Item[];
 		versions: ContentVersion[];
 		selection: (number | string)[];
 		selectMode: boolean;
@@ -34,9 +36,12 @@ const props = withDefaults(
 		selectAll: () => void;
 		sortField?: string;
 		parentField: string | null;
+		parents: PrimaryKey[] | never[];
+		childrenField: string | null;
 		resetPresetAndRefresh: () => Promise<void>;
 		sort: string[];
 		loading: boolean;
+		loadingAll: boolean;
 		showSelect?: ShowSelect;
 		error?: any;
 		itemCount: number | null;
@@ -56,22 +61,27 @@ const props = withDefaults(
 		saveEdits: (edits: Record<PrimaryKey, Item>) => void;
 		canDeletePages: boolean;
 		deletePage: (id: PrimaryKey) => void;
+		fetchAllRecords: (currentItems: PrimaryKey[]) => Promise<Item[]>;
+		fetchChildren: (parentID: string) => Promise<Item[]>;
 	}>(),
 	{
 		showSelect: 'multiple',
 	},
 );
 
-const emit = defineEmits(['update:selection', 'update:limit', 'update:size', 'update:sort', 'update:width']);
+const emit = defineEmits(['update:selection', 'update:page', 'update:limit', 'update:size', 'update:sort', 'update:width', 'update:parents']);
 
 const { t } = useI18n();
 const { collection } = toRefs(props);
 
 const selectionWritable = useSync(props, 'selection', emit);
 const limitWritable = useSync(props, 'limit', emit);
+const parentsWritable = useSync(props, 'parents', emit);
 // const sortWritable = useSync(props, 'sort', emit);
 
 // const toggleSort = ref<boolean>(false);
+
+watch(() => parentsWritable.value, () => (console.log("Changed:", parentsWritable.value)));
 
 const mainElement = inject<Ref<Element | undefined>>('main-element');
 
@@ -117,24 +127,33 @@ watch(innerWidth, (value) => {
 	emit('update:width', value);
 });
 
+// console.log(props.items);
+
+// watch(() => props.items, () => {
+// 	console.log(props.items);
+// });
+
 </script>
 <template>
-	<v-notice v-if="!items" type="info">
-		Error with API
-	</v-notice>
+	<v-info v-if="!parentField || !childrenField" title="Layout not configured" style="height: 76vh; justify-content: center;" icon="error">Please set the Parent and Children relational fields in the layout settings.</v-info>
+	<v-info v-else-if="!items || !allItems" title="Internal Server Error" style="height: 76vh; justify-content: center;" icon="error">Error with API</v-info>
 	<v-notice v-else-if="loading" type="info">
 		Loading...
 	</v-notice>
+	<Loading v-else-if="loading" />
+	<v-info v-else-if="itemCount && itemCount == 0" style="height: 76vh; justify-content: center;" title="No Items" icon="warning"></v-info>
 	<div v-else class="widget-box site-structure">
 		<TreeView
-			v-if="loading || (itemCount && itemCount > 0 && !error)"
-			v-model="selectionWritable"
+			v-if="!error"
+			v-model:selection="selectionWritable"
+			v-model:expanded="parentsWritable"
 			:show-select="showSelect ? showSelect : selection !== undefined ? 'multiple' : 'none'"
 			must-sort
-			:items="items"
+			:items="[...items, ...allItems]"
 			:versions
 			:sort="sort"
 			:loading="loading"
+			:loading-all="loadingAll"
 			:is-filtered="isFiltered"
 			:item-key="primaryKeyField?.field"
 			:show-manual-sort="!isFiltered"
@@ -143,6 +162,8 @@ watch(innerWidth, (value) => {
 			allow-header-reorder
 			selection-use-keys
 			:parent-field
+			:parents
+			:children-field
 			:collection
 			:layout-options="{
 				pageTitle,
@@ -153,6 +174,8 @@ watch(innerWidth, (value) => {
 			}"
 			:select-mode="selectMode"
 			:can-delete-pages="canDeletePages"
+			:fetch-all-records
+			:fetch-children
 			@click:row="onRowClick"
 			@update:sort="onSortChange"
 			@update:items="saveEdits"

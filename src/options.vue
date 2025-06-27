@@ -11,6 +11,7 @@ const props = defineProps<{
   fields: Field[];
   sortField: string;
   parentField: string | null;
+  childrenField: string | null;
 	pageTitle: string | null;
   pageType: string | null;
   pageSlug: string | null;
@@ -20,6 +21,7 @@ const props = defineProps<{
 
 const emit = defineEmits([
   'update:parentField',
+  'update:childrenField',
   'update:pageTitle',
   'update:pageType',
   'update:pageSlug',
@@ -30,6 +32,7 @@ const emit = defineEmits([
 const { t } = useI18n();
 
 const parentFieldWritable = useSync(props, 'parentField', emit);
+const childrenFieldWritable = useSync(props, 'childrenField', emit);
 const titleWritable = useSync(props, 'pageTitle', emit);
 const pageTypeWritable = useSync(props, 'pageType', emit);
 const pageSlugWritable = useSync(props, 'pageSlug', emit);
@@ -44,6 +47,14 @@ const selfReferencingM2oFields = computed(() => {
 			)
 			&& field.meta?.special?.includes('m2o')
 			&& field.schema?.foreign_key_table === props.collection,
+	);
+});
+
+const O2mFields = computed(() => {
+	return props.fieldsInCollection?.filter(
+		(field: Field) =>
+			field.type === 'alias'
+			&& field.meta?.special?.includes('o2m')
 	);
 });
 
@@ -79,12 +90,25 @@ const booleanFields = computed(() => {
 
         <small v-if="!parentFieldWritable" class="type-note">Note that selecting a field can immediately update the sort
           values of your items!</small>
-
-        <small v-if="parentFieldWritable" class="type-note">To use the Site Structure features, be sure to click the
-          <v-icon name="sort" small />
-          button to enable manual sorting!</small>
       </template>
     </div>
+
+    <div class="field">
+      <div class="type-label">Children (O2M)</div>
+      <v-notice v-if="!O2mFields?.length" type="warning">
+        Create a O2M children field that references this collection in your data
+        model settings!
+      </v-notice>
+
+      <template v-else>
+        <v-select v-model="childrenFieldWritable" :items="O2mFields" item-value="field" item-text="name"
+          show-deselect :placeholder="t('select_a_field')" />
+
+        <small v-if="!childrenFieldWritable" class="type-note">Note that selecting a field can immediately update the sort
+          values of your items!</small>
+      </template>
+    </div>
+
 
     <div class="field">
       <div class="type-label">{{ t('layouts.cards.title') }}</div>

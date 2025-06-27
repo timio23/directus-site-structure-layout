@@ -34,6 +34,7 @@ export default defineLayout({
 		const permissionsStore = usePermissionsStore();
 		// const { useFieldsStore } = system.stores;
 		// const fieldsStore = useFieldsStore();
+		const loadingAll = ref(false);
 
 		const { t, n } = useI18n();
 
@@ -46,7 +47,7 @@ export default defineLayout({
 
 		const versions = ref([]);
 
-		const { sort, limit, page, fields } = useItemOptions();
+		const { sort, limit, page, fields, parents } = useItemOptions();
 
 		const { aliasedFields, aliasQuery, aliasedKeys } = useAliasFields(fields, collection);
 
@@ -56,7 +57,7 @@ export default defineLayout({
 			),
 		);
 
-		const { parentField, fieldsToQuery } = useTreeViewFieldsToQuery({
+		const { parentField, childrenField, fieldsToQuery } = useTreeViewFieldsToQuery({
 			fieldsWithRelationalAliased,
 			primaryKeyField,
 			sortField,
@@ -95,6 +96,8 @@ export default defineLayout({
 			...layoutField.value
 		];
 
+		const allItems = ref<Item[]>([]);
+
 		const {
 			items,
 			loading,
@@ -107,15 +110,91 @@ export default defineLayout({
 			getItemCount,
 			getTotalCount
 		} = useItems(collection, {
-			sort: ref([primaryKeyField.value?.field ?? 'id']),
+			sort: ref([sortField.value ?? primaryKeyField.value?.field ?? 'id']),
 			limit: selectMode.value || isFiltered.value ? limit : ref(-1),
+			// limit: ref(100),
 			page: selectMode.value || isFiltered.value ? page : ref(1),
 			fields: ref<string[]>(combinedFieldsQuery.filter((value, index) => combinedFieldsQuery.indexOf(value) === index)),
+			// fields: ref<string[]>([primaryKeyField.value?.field ?? 'id', parentField.value, sortField.value ?? 'sort']),
 			alias: aliasQuery,
-			filter,
+			// filter,
+			filter: ref<Filter | {}>({ _and: [
+				parentField.value ? {
+					_or: [
+						{
+							[parentField.value]: {
+								_null: true,
+							},
+						},
+						parents.value.length > 0 ? {
+							[parentField.value]: {
+								_in: parents.value,
+							},
+						} : {},
+					],
+				} : {},
+				filter.value
+			]}),
 			search,
 			filterSystem,
 		});
+
+		async function fetchChildren(parentID: string){
+			const response = await api.get(`/items/${collection.value}`, { params: {
+				sort: [sortField.value ?? primaryKeyField.value?.field ?? 'id'],
+				fields: [primaryKeyField.value?.field, ...combinedFieldsQuery.filter((value, index) => combinedFieldsQuery.indexOf(value) === index)],
+				filter: parentField.value ? {
+						[parentField.value]: {
+							_eq: parentID,
+						},
+					} : {},
+				limit: -1,
+				page: 1,
+			}});
+
+			if(response && response.data){
+				return response.data.data;
+			}
+		}
+		
+		function fetchAllRecords(currentItems: PrimaryKey[] = []){
+			if(totalCount.value && !isFiltered.value){
+				loadingAll.value = true;
+				allItems.value = [];
+				let next_page = 1
+				const promises = [];
+				while (totalCount.value > (next_page - 1) * 100) {
+					const promise = fetchRemaining(next_page);
+					promises.push(promise);
+					next_page++;
+				}
+
+				Promise.all(promises).then(res => {
+					res.map((r) => {
+						if(r && r.data){
+							allItems.value.push(...r.data.data.filter((item: Item) => !currentItems.includes(item[primaryKeyField.value?.field!])).map((item: Item) => {
+								return {
+									...item,
+									"--collapsed": true,
+									"--collapsed-parents": [item[parentField.value]],
+								}
+							}));
+						}
+					});
+					loadingAll.value = false
+				});
+			}
+
+			function fetchRemaining(page: number){
+				return api.get(`/items/${collection.value}`, { params: {
+					sort: [sortField.value ?? primaryKeyField.value?.field ?? 'id'],
+					fields: [primaryKeyField.value?.field, ...combinedFieldsQuery.filter((value, index) => combinedFieldsQuery.indexOf(value) === index)],
+					filter: filter.value,
+					limit: 100,
+					page: page
+				}});
+			}
+		}
 
 		async function fetchVersions() {
 			try {
@@ -156,13 +235,17 @@ export default defineLayout({
 		return {
 			info,
 			items,
+			allItems,
 			versions,
 			loading,
+			loadingAll,
 			filter,
 			search,
 			error,
 			refresh,
 			resetPresetAndRefresh,
+			fetchAllRecords,
+			fetchChildren,
 			
 			// Pagination
 			limit,
@@ -188,6 +271,7 @@ export default defineLayout({
 		
 			// Layout Options
 			fields,
+			layoutField,
 			fileFields,
 			pageTitle,
 			pageType,
@@ -196,6 +280,8 @@ export default defineLayout({
 			pageAdditional,
 			
 			parentField,
+			parents,
+			childrenField,
 			fieldsWithRelationalAliased,
 			aliasedFields,
 			aliasedKeys,
@@ -213,7 +299,9 @@ export default defineLayout({
 		function refresh() {
 			getItems();
 			getTotalCount();
-			getItemCount();
+			// if(isFiltered.value){
+				getItemCount();
+			// }
 		}
 
 		async function deletePage(id: string | number) {
@@ -252,6 +340,7 @@ export default defineLayout({
 			// Pagination
 			const page = syncRefProperty(layoutQuery, 'page', 1);
 			const limit = syncRefProperty(layoutQuery, 'limit', 25);
+			
 			// Sort
 			const defaultSort = computed(() => (primaryKeyField.value ? [primaryKeyField.value?.field] : []));
 			const sort = syncRefProperty(layoutQuery, 'sort', defaultSort);
@@ -264,9 +353,10 @@ export default defineLayout({
 					.sort();
 			});
 		
+			const parents = syncRefProperty(layoutQuery, 'parents', []);
 			const fields = syncRefProperty(layoutQuery, 'fields', fieldsDefaultValue);
 		
-			return { sort, limit, page, fields };
+			return { sort, limit, page, fields, parents };
 		}
 
 		function useTreeViewFieldsToQuery({
@@ -279,11 +369,13 @@ export default defineLayout({
 			sortField: ComputedRef<string | null>;
 		}) {
 			const parentField = syncRefProperty(layoutOptions, 'parent', null);
+			const childrenField = syncRefProperty(layoutOptions, 'childrenField', null);
 
 			const fieldsToQuery = computed(() => {
 				const fieldsToQuery = fieldsWithRelationalAliased.value;
 				addSortField();
 				addParentField();
+				addChildrenField();
 
 				return fieldsToQuery;
 
@@ -310,23 +402,37 @@ export default defineLayout({
 						)
 					) {
 						fieldsToQuery.push(
-							`${parentField.value}.${primaryKeyField.value.field}`,
+							// `${parentField.value}.${primaryKeyField.value.field}`,
+							parentField.value
 						);
+					}
+				}
+
+				function addChildrenField() {
+					if (
+						childrenField.value
+						&& !fieldsToQuery.includes(
+							childrenField.value,
+						)
+					) {
+						fieldsToQuery.push(childrenField.value);
 					}
 				}
 			});
 
 			watch(() => parentField.value, updateItemsOnNewParentQuery);
+			watch(() => childrenField.value, updateItemsOnNewParentQuery);
 
 			return {
 				parentField,
+				childrenField,
 				fieldsToQuery,
 			};
 
 			function updateItemsOnNewParentQuery(
-				newParentField: string | null | undefined,
+				newRelationalField: string | null | undefined,
 			) {
-				if (newParentField)
+				if (newRelationalField)
 					refresh();
 			}
 		}
@@ -435,7 +541,7 @@ export default defineLayout({
 					unexpectedError(error);
 				}
 
-				refresh();
+				// refresh();
 			}
 
 			// Based from the core: /app/src/utils/unexpected-error.ts
