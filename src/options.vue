@@ -8,13 +8,13 @@ const props = defineProps<{
 	collection: string;
   fieldsInCollection: any;
 	fileFields: Field[];
-  fields: Field[];
   sortField: string;
   parentField: string | null;
   childrenField: string | null;
 	pageTitle: string | null;
   pageType: string | null;
   pageSlug: string | null;
+  pageHost: string | null;
   pageVisibility: string | null;
   pageAdditional: string | null;
 }>();
@@ -25,6 +25,7 @@ const emit = defineEmits([
   'update:pageTitle',
   'update:pageType',
   'update:pageSlug',
+  'update:pageHost',
   'update:pageVisibility',
   'update:pageAdditional',
 ]);
@@ -36,6 +37,7 @@ const childrenFieldWritable = useSync(props, 'childrenField', emit);
 const titleWritable = useSync(props, 'pageTitle', emit);
 const pageTypeWritable = useSync(props, 'pageType', emit);
 const pageSlugWritable = useSync(props, 'pageSlug', emit);
+const pageHostWritable = useSync(props, 'pageHost', emit);
 const pageVisibilityWritable = useSync(props, 'pageVisibility', emit);
 const additionalWritable = useSync(props, 'pageAdditional', emit);
 
@@ -125,6 +127,11 @@ const booleanFields = computed(() => {
       <div class="type-label">Slug {{ t('field') }}</div>
       <v-select v-model="pageSlugWritable" show-deselect item-value="field" item-text="name" :items="stringFields"
       :placeholder="t('select_a_field')" />
+    </div>
+
+    <div class="field">
+      <div class="type-label">Page Host URL</div>
+      <v-input v-model="pageHostWritable" placeholder="https://website.com/" />
     </div>
 
     <div class="field">

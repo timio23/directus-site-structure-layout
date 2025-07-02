@@ -1,5 +1,7 @@
 # Site Structure Layout
 
+**Warning: This is in active development and will most likely have breaking changes in future.**
+
 Visulaizes a hierarchical table of webpages based on parent-child relationships, allowing users to intuitively explore and manage a site strcuture in Directus.
 
 ![Site Structure Layout](https://raw.githubusercontent.com/timio23/directus-site-structure-layout/main/docs/site-structure-layout.jpg)
@@ -16,6 +18,8 @@ Visulaizes a hierarchical table of webpages based on parent-child relationships,
 - Directus 11.1.2+
 - Admin user to install the extension
 - Parent (M2O) relational field linked to the same collection
+- Children (O2M) relational field linked to the same collection and field used for the Parent relation.
+- Sort field on the collection
 
 ## Installation
 

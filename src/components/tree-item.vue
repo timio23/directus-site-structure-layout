@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { ShowSelect } from '@directus/extensions';
-import type { ContentVersion } from '@directus/types';
-import type { Depths, Item, LayoutOptions } from '../types';
+import type { ContentVersion, PrimaryKey } from '@directus/types';
+import type { Branch, Item, LayoutOptions } from '../types';
 import type { Ref } from 'vue';
 import { ref, inject, computed } from 'vue';
 import { useI18n } from 'vue-i18n';
@@ -9,7 +9,7 @@ import BranchLine from './branch-line.vue';
 import { getItemRoute } from '../utils/get-route';
 import { useRouter } from 'vue-router';
 
-const branches = defineModel<Depths>('branches');
+const branches = defineModel<Record<PrimaryKey,Branch>>('branches');
 
 const props = withDefaults(
 	defineProps<{
@@ -19,15 +19,13 @@ const props = withDefaults(
 		itemKey: string;
 		parentKey: string;
 		branchLinesKey: string,
-		// structure: Nest[],
+		branchLoading: boolean;
 		manualSortKey: string;
 		toggleSort?: boolean;
 		indent?: number;
 		indentWidth?: number;
 		isFiltered: boolean;
 		sorting?: boolean;
-		childrenCollapsed?: boolean;
-		collapsed?: boolean;
 		hasChildren?: boolean;
 		selectMode: boolean;
 		showSelect: ShowSelect;
@@ -60,8 +58,20 @@ const router = useRouter();
 const typeKey = ref<string>(props.layoutOptions?.pageType ?? 'type');
 const visibilityKey = ref<string>(props.layoutOptions?.pageVisibility ?? 'visibility');
 
+const childrenCollapsed = computed<boolean>(() => {
+	return branches.value?.[props.item[props.itemKey]]?.['--collapsed'] ?? true;
+});
+const collapsed = computed<boolean>(() => {
+	return !!branches.value?.[props.item[props.itemKey]]?.['--collapsed-parents'];
+});
+
 async function deletePage(id: string | number){
 	emit('delete:item', id);
+}
+
+async function openLink(slug: string){
+	if(props.layoutOptions?.pageHost && slug)
+		window.open(`${props.layoutOptions.pageHost}${slug}`, '_blank');
 }
 
 const itemVersions = computed(() => {
@@ -146,7 +156,7 @@ function editVersion({ collection, item, primaryKeyField, versionKey }: { collec
 // console.log('Item', props.item);
 </script>
 <template>
-	<v-list-item :data-id="item[itemKey]" class="tree-line-item line-item-header clearfix"
+	<v-list-item v-if="item && branches && itemKey" :data-id="item[itemKey]" :data-sort="item.sort" class="tree-line-item line-item-header clearfix"
 		:class="{
 			subdued,
 			clickable: hasClickListener,
@@ -181,7 +191,7 @@ function editVersion({ collection, item, primaryKeyField, versionKey }: { collec
 				:name="childrenCollapsed ? 'add_circle_outline' : 'remove_circle_outline'"
 				class="collapse-btn"
 				:class="{ 'children-collapsed': childrenCollapsed }"
-				@click.stop="$emit('toggle-children')"
+				@click.stop="!branchLoading ? $emit('toggle-children') : false"
 			/>
 			<span v-else-if="!isFiltered" class="icon-placeholder"></span>
 			<v-icon
@@ -245,6 +255,12 @@ function editVersion({ collection, item, primaryKeyField, versionKey }: { collec
 							</v-list-item-icon>
 							<v-list-item-content>{{ t('edit') }}</v-list-item-content>
 						</v-list-item>
+						<v-list-item v-if="layoutOptions?.pageSlug && layoutOptions?.pageHost" clickable @click="openLink(item[layoutOptions.pageSlug!])">
+							<v-list-item-icon>
+								<v-icon name="visibility" filled />
+							</v-list-item-icon>
+							<v-list-item-content>Preview</v-list-item-content>
+						</v-list-item>
 						<!-- <v-list-item v-if="page[typefield] == 'page'" clickable :to="`/site/${page.id}`">
 								<v-list-item-icon>
 										<v-icon name="preview" filled />
@@ -283,6 +299,7 @@ function editVersion({ collection, item, primaryKeyField, versionKey }: { collec
 	position: relative;
 	min-width: 25px;
 	width: 25px;
+	height: 24px;
 	padding: 0 0.5px;
 	z-index: 2;
 	background-color: var(--theme--background);

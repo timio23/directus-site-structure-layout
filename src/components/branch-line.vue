@@ -1,10 +1,12 @@
 <script setup lang="ts">
   import { ref } from 'vue';
-  const branches = defineModel<any>('branches')
+  import type { PrimaryKey } from '@directus/types';
+  import type { Branch } from '../types';
+  const branches = defineModel<Record<PrimaryKey, Branch>>('branches')
 
   const props = withDefaults(
     defineProps<{
-      branchId: string,
+      branchId: PrimaryKey,
       indentWidth: number,
       updateChildren?: boolean,
     }>(),
@@ -13,20 +15,24 @@
       updateChildren: false,
     }
   );
-  const branch = ref(branches.value[props.branchId]);
-  const parent_id: string = branch.value['--parentId'];
-  const depth: number = branch.value['--depth'];
-  const parentBranch = branches.value[parent_id];
-  const children: number = parentBranch?.children ?? 0;
+
+  const branch = ref<Branch | undefined>(branches.value?.[props.branchId]);
+  const parent_id: PrimaryKey | undefined = branch.value?.['--parentId'];
+  const depth: number = branch.value?.['--depth'] ?? 0;
+  const parentBranch = branches.value?.[parent_id!] ?? null;
+  const siblings: number = parentBranch?.children ?? 0;
+  
   // console.log('parentBranch', parentBranch);
-  if(props.updateChildren && parentBranch?.children > 0){
-    branches.value[parent_id].children--;
+  if(props.updateChildren && siblings > 0){
+    if(branches.value && parent_id && parent_id in branches.value && branches.value[parent_id]){
+      branches.value[parent_id].children--;
+    }
   }
 </script>
 <template>
-  <div v-if="branch && depth > 0" :style="{ borderColor: children > 0 ? 'var(--theme--foreground-subdued)' : 'transparent' }" class="line" :data-parent="parent_id" :data-id="branch.id" :data-depth="branch['--depth']" :data-parents="branch.parents" :data-children="branch.children">
+  <div v-if="branches && branch && depth > 0" :style="{ borderColor: siblings > 0 ? 'var(--theme--foreground-subdued)' : 'transparent' }" class="line" :data-parent="parent_id" :data-depth="branch['--depth']" :data-children="branch.children">
     <branch-line
-      v-if="branches[parent_id]"
+      v-if="parent_id && branches?.[parent_id]"
       v-model:branches="branches"
       :branch-id="parent_id"
       :indent-width="props.indentWidth"

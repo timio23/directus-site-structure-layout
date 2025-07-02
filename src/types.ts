@@ -1,5 +1,13 @@
-import type { Collection as CollectionRaw, CollectionType } from '@directus/types';
+import type { Collection as CollectionRaw, CollectionType, PrimaryKey } from '@directus/types';
 import type { TranslateResult } from 'vue-i18n';
+
+export interface Branch {
+	['--depth']: number;
+	['--parentId']: PrimaryKey;
+	children: number;
+	['--collapsed']: boolean;
+	['--collapsed-parents']: boolean;
+};
 
 export interface Branches {
 	branch: number;
@@ -16,10 +24,12 @@ export interface Nest {
 }
 
 export type LayoutOptions = {
+	parentField?: string;
 	childrenField?: string;
 	pageTitle?: string;
   pageType?: string;
 	pageSlug?: string;
+	pageHost?: string;
 	pageVisibility?: string;
 	pageAdditional?: string;
 };

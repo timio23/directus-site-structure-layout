@@ -50,6 +50,7 @@ const props = withDefaults(
 		pageTitle?: string;
 		pageType?: string;
 		pageSlug?: string;
+		pageHost?: string;
 		pageVisibility?: string;
 		pageAdditional?: string;
 		info?: Collection;
@@ -61,7 +62,7 @@ const props = withDefaults(
 		saveEdits: (edits: Record<PrimaryKey, Item>) => void;
 		canDeletePages: boolean;
 		deletePage: (id: PrimaryKey) => void;
-		fetchAllRecords: (currentItems: PrimaryKey[]) => Promise<Item[]>;
+		fetchAllRecords: () => Promise<Item[]>;
 		fetchChildren: (parentID: string) => Promise<Item[]>;
 	}>(),
 	{
@@ -81,7 +82,7 @@ const parentsWritable = useSync(props, 'parents', emit);
 
 // const toggleSort = ref<boolean>(false);
 
-watch(() => parentsWritable.value, () => (console.log("Changed:", parentsWritable.value)));
+// watch(() => parentsWritable.value, () => (console.log("Changed:", parentsWritable.value)));
 
 const mainElement = inject<Ref<Element | undefined>>('main-element');
 
@@ -136,10 +137,7 @@ watch(innerWidth, (value) => {
 </script>
 <template>
 	<v-info v-if="!parentField || !childrenField" title="Layout not configured" style="height: 76vh; justify-content: center;" icon="error">Please set the Parent and Children relational fields in the layout settings.</v-info>
-	<v-info v-else-if="!items || !allItems" title="Internal Server Error" style="height: 76vh; justify-content: center;" icon="error">Error with API</v-info>
-	<v-notice v-else-if="loading" type="info">
-		Loading...
-	</v-notice>
+	<v-info v-else-if="!items" title="Internal Server Error" style="height: 76vh; justify-content: center;" icon="error">Error with API</v-info>
 	<Loading v-else-if="loading" />
 	<v-info v-else-if="itemCount && itemCount == 0" style="height: 76vh; justify-content: center;" title="No Items" icon="warning"></v-info>
 	<div v-else class="widget-box site-structure">
@@ -149,7 +147,7 @@ watch(innerWidth, (value) => {
 			v-model:expanded="parentsWritable"
 			:show-select="showSelect ? showSelect : selection !== undefined ? 'multiple' : 'none'"
 			must-sort
-			:items="[...items, ...allItems]"
+			:items
 			:versions
 			:sort="sort"
 			:loading="loading"
@@ -169,6 +167,7 @@ watch(innerWidth, (value) => {
 				pageTitle,
 				pageType,
 				pageSlug,
+				pageHost,
 				pageVisibility,
 				pageAdditional,
 			}"
